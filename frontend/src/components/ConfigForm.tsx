@@ -58,12 +58,12 @@ export function ConfigForm({ onSearch, isLoading }: ConfigFormProps) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Suchstrings <span className="text-gray-400 font-normal">(einer pro Zeile)</span>
+            Suchstrings <span className="text-gray-400 font-normal">(einer pro Zeile — <code className="bg-gray-100 px-1 rounded">*</code> als Wildcard möglich)</span>
           </label>
           <textarea
             value={searchStrings}
             onChange={e => setSearchStrings(e.target.value)}
-            placeholder={'MyClass\nSomeMethod\nimportant_string'}
+            placeholder={'MyClass\nWE.KSQ.MWE.*\nimportant_string'}
             rows={5}
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
             required

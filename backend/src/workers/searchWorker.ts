@@ -14,6 +14,14 @@ export type WorkerMessage = ProgressMessage | ResultMessage | DoneMessage;
 
 const { files, searchStrings } = workerData as WorkerInput;
 
+function toRegex(pattern: string): RegExp {
+  // Split on * so dots and other chars are treated as literals
+  const parts = pattern.split('*').map(p => p.replace(/[.+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(parts.join('.*'));
+}
+
+const regexes = searchStrings.map(toRegex);
+
 async function run() {
   for (const filePath of files) {
     try {
@@ -21,9 +29,9 @@ async function run() {
       const lines = content.split('\n');
       const matches: ResultMessage['matches'] = [];
       for (let i = 0; i < lines.length; i++) {
-        for (const str of searchStrings) {
-          if (lines[i].includes(str)) {
-            matches.push({ lineNumber: i + 1, lineContent: lines[i], matchedString: str });
+        for (let s = 0; s < regexes.length; s++) {
+          if (regexes[s].test(lines[i])) {
+            matches.push({ lineNumber: i + 1, lineContent: lines[i], matchedString: searchStrings[s] });
           }
         }
       }
