@@ -1,0 +1,19 @@
+services:
+  backend:
+    build: ./backend
+    environment:
+      - PORT=3001
+    volumes:
+      # Einmalig: Pfad zu deinem lokalen Repos-Ordner anpassen.
+      # Danach wird das Repository direkt in der UI ausgewählt.
+      - C:\Users\DeinName\repos:/repos:ro        # Windows
+      # - /Users/DeinName/repos:/repos:ro        # Mac/Linux
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
