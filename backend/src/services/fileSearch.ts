@@ -49,7 +49,7 @@ export function searchDirectoryStreaming(
   allFiles.forEach((file, i) => batches[i % numWorkers].push(file));
   const activeBatches = batches.filter(b => b.length > 0);
 
-  const workerScript = path.resolve(__dirname, 'workers', 'searchWorker.js');
+  const workerScript = path.resolve(__dirname, '..', 'workers', 'searchWorker.js');
   let processed = 0;
   let doneCount = 0;
 
