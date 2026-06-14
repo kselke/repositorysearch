@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { SearchRequest } from '../types';
-import { searchDirectory } from '../services/fileSearch';
+import { collectFiles, searchDirectoryStreaming } from '../services/fileSearch';
 
 const router = Router();
 
@@ -23,38 +23,60 @@ router.get('/browse', (req: Request, res: Response) => {
 
 router.get('/validate', (req: Request, res: Response) => {
   const basePath = req.query['basePath'] as string | undefined;
-  if (!basePath) {
-    return res.json({ valid: false, error: 'basePath fehlt' });
-  }
+  if (!basePath) return res.json({ valid: false, error: 'basePath fehlt' });
   try {
     const stat = fs.statSync(basePath);
-    if (!stat.isDirectory()) {
-      return res.json({ valid: false, error: 'Pfad ist kein Verzeichnis' });
-    }
+    if (!stat.isDirectory()) return res.json({ valid: false, error: 'Pfad ist kein Verzeichnis' });
     return res.json({ valid: true });
   } catch {
     return res.json({ valid: false, error: `Verzeichnis nicht gefunden: ${basePath}` });
   }
 });
 
-router.post('/search', (req: Request, res: Response) => {
+// Streaming search via SSE
+router.post('/search-stream', async (req: Request, res: Response) => {
   const { basePath, searchStrings, excludePatterns } = req.body as SearchRequest;
 
   if (!basePath || !Array.isArray(searchStrings) || searchStrings.length === 0) {
-    return res.status(400).json({ error: 'basePath und searchStrings sind erforderlich' });
+    res.status(400).json({ error: 'basePath und searchStrings sind erforderlich' });
+    return;
   }
-
   try {
-    const stat = fs.statSync(basePath);
-    if (!stat.isDirectory()) {
-      return res.status(400).json({ error: 'basePath ist kein Verzeichnis' });
+    if (!fs.statSync(basePath).isDirectory()) {
+      res.status(400).json({ error: 'basePath ist kein Verzeichnis' });
+      return;
     }
   } catch {
-    return res.status(400).json({ error: `Verzeichnis nicht gefunden: ${basePath}` });
+    res.status(400).json({ error: `Verzeichnis nicht gefunden: ${basePath}` });
+    return;
   }
 
-  const { results, totalFiles } = searchDirectory(basePath, searchStrings, excludePatterns ?? []);
-  return res.json({ results, totalFiles });
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (event: string, data: unknown) =>
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  // Send total file count immediately so frontend can show the denominator
+  const total = collectFiles(basePath, excludePatterns ?? []).length;
+  send('total', { total });
+
+  try {
+    await searchDirectoryStreaming(
+      basePath,
+      searchStrings,
+      excludePatterns ?? [],
+      result => send('result', result),
+      (processed, _total) => send('progress', { processed, total: _total })
+    );
+  } catch (e: unknown) {
+    send('error', { error: e instanceof Error ? e.message : 'Unbekannter Fehler' });
+  }
+
+  send('done', {});
+  res.end();
 });
 
 export default router;
